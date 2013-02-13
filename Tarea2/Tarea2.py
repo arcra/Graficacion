@@ -17,13 +17,13 @@ def multiplyMatrix(M1, M2):
 			M3[row].append(value)
 	return M3
 
-def getRotationMatrix(angle):
+def getTransformationMatrix(angle, dx, dy, scaleX=1, scaleY=1):
 	angle = -angle*pi/180
 	sinx = sin(angle)
 	cosx = cos(angle)
-	return [[cosx,	-sinx,	0],
-			[sinx,	cosx,	0],
-			[0,		0,		1]]
+	return [[scaleX*cosx,	-sinx,			dx],
+			[sinx,			scaleY*cosx,	dy],
+			[0,				0,				1]]
 
 
 class arcPoint():
@@ -32,16 +32,12 @@ class arcPoint():
 		self.x = x
 		self.y = y
 		self.color = color
-	
-	def translate(self, dx, dy):
-		self.x = self.x + dx
-		self.y = self.y + dy
-	
-	def rotate(self, angle):
-		rotationMatrix = getRotationMatrix(angle)
-		rotatedPoint = multiplyMatrix(rotationMatrix, [[self.x], [self.y], [1]])
-		self.x = int(rotatedPoint[0][0])
-		self.y = int(rotatedPoint[1][0])
+		
+	def transform(self, angle=0,dx=0,dy=0, scaleX=1, scaleY=1):
+		transformationMatrix = getTransformationMatrix(angle, dx, dy, scaleX, scaleY)
+		newPoint = multiplyMatrix(transformationMatrix, [[self.x], [self.y], [1]])
+		self.x = int(newPoint[0][0])
+		self.y = int(newPoint[1][0])
 
 class arcCanvasWindow(QWidget):
 	
@@ -106,9 +102,8 @@ if __name__ == '__main__':
 	for p in triangle:
 		orImg.addPoint(p)
 		newPoint = arcPoint(p.x, p.y)
-		newPoint.translate(-halfWidth, -75)
-		newPoint.rotate(30)
-		newPoint.translate(halfWidth, 75)
+		newPoint.transform(0, -halfWidth, -75)
+		newPoint.transform(30, halfWidth, 75)
 		rotatedImg.addPoint(newPoint)
 	
 	sys.exit(app.exec_())
