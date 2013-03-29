@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import sys
-from PyQt4.QtGui import QWidget, QPainter, QApplication
+from PyQt4.QtGui import QWidget, QPainter, QApplication, QColor
 from PyQt4.QtCore import Qt, QRect, SIGNAL
 from math import sin, cos, pi, sqrt
 
@@ -18,12 +18,62 @@ currentMatrix = [	[1, 0, 0, 0],
 					[0, 0, 0, 1]
 				]
 
-points = []
+polygons = []
 
+sideCount = 1
+tempPolygon = []
+
+currentColor = QColor(255, 255, 255)
+
+lights = []
+
+ka = kd = ks = 1.0
+ksp = 3.0
+
+def arcSetColor(r, g, b):
+	global currentColor
+	currentColor = QColor(r, g, b)
+
+def arcSetOmniLight(x, y, z):
+	global lights
+	lights.append(arcPoint(x, y, z))
+	
+def arcSetDiffuseConstant(k):
+	global kd
+	kd = k
+	
+def arcSetAmbientConstant(k):
+	global ka
+	ka = k
+
+def arcSetSpecularConstant(k):
+	global ks
+	ks = k
+
+def arcSetSpecularCoefficient(k):
+	global ksp
+	ksp = k
+
+def arcClearScreen():
+	global polygons
+	polygons = []
+	
 def arcSetPoint(p):
-	global points
+	global polygons, tempPolygon, sideCount 
 	p.multMatrix(currentMatrix)
-	points.append(p)
+	tempPolygon.append(p)
+	if len(tempPolygon) == sideCount:
+		polygons.append(tempPolygon)
+		tempPolygon = []		
+		
+
+def arcBeginPolygon(sides = 3):
+	global sideCount
+	sideCount = sides
+	
+def arcEndPolygon():
+	global sideCount
+	sideCount = 1
 
 def arcPushMatrix():
 	global matrixStack, currentMatrix
@@ -55,7 +105,7 @@ def arcScale(sx, sy, sz):
 	
 	currentMatrix = arcMultiplyMatrices(currentMatrix, scalationMatrix)
 
-def arcRotateX(angle):
+def arcRotateX(angle, vector=None):
 	global currentMatrix
 	angle = angle*pi/180
 	sinx = sin(angle)
@@ -67,10 +117,15 @@ def arcRotateX(angle):
 				[0,		-sinx,	cosx,	0],
 				[0,		0, 		0,		1]
 				]
-	
-	currentMatrix = arcMultiplyMatrices(currentMatrix, rotationX)
+	if vector is None:
+		currentMatrix = arcMultiplyMatrices(currentMatrix, rotationX)
+	else:
+		if vector.__class__.__name__ == 'arcPoint':
+			vector.multMatrix(rotationX)
+		else:
+			return arcMultiplyMatrices(rotationX, vector)
 
-def arcRotateY(angle):
+def arcRotateY(angle, vector=None):
 	global currentMatrix
 	
 	angle = angle*pi/180
@@ -85,9 +140,15 @@ def arcRotateY(angle):
 				[0,		0, 		0,		1]
 				]
 	
-	currentMatrix = arcMultiplyMatrices(currentMatrix, rotationY)
+	if vector is None:
+		currentMatrix = arcMultiplyMatrices(currentMatrix, rotationY)
+	else:
+		if vector.__class__.__name__ == 'arcPoint':
+			vector.multMatrix(rotationY)
+		else:
+			return arcMultiplyMatrices(rotationY, vector)
 	
-def arcRotateZ(angle):
+def arcRotateZ(angle, vector=None):
 	global currentMatrix
 	angle = angle*pi/180
 	
@@ -101,7 +162,13 @@ def arcRotateZ(angle):
 				[0,		0, 		0,	1]
 				]
 	
-	currentMatrix = arcMultiplyMatrices(currentMatrix, rotationZ)
+	if vector is None:
+		currentMatrix = arcMultiplyMatrices(currentMatrix, rotationZ)
+	else:
+		if vector.__class__.__name__ == 'arcPoint':
+			vector.multMatrix(rotationZ)
+		else:
+			return arcMultiplyMatrices(rotationZ, vector)
 
 def arcMultiplyMatrices(*matrices):
 	M = matrices[0]
@@ -118,35 +185,62 @@ def arcMultiplyMatrices(*matrices):
 	return M
 
 class arcPoint():
-	
-	def __init__(self, x, y, z=0, color=Qt.white):
-		self.x = x
-		self.y = y
-		self.z = z
-		self.color = color
+	global currentColor
+	def __init__(self, x, y=0, z=0, color=None):
+		if x.__class__.__name__ == 'arcPoint':
+			self.x = x.x
+			self.y = x.y
+			self.z = x.z
+			self.color = QColor(x.color.red(), x.color.green(), x.color.blue())
+		else:
+			self.x = x
+			self.y = y
+			self.z = z
+			if color:
+				self.color = QColor(color.red(), color.green(), color.blue())
+			else:
+				self.color = QColor(currentColor.red(), currentColor.green(), currentColor.blue())
 	
 	def __sub__(self, p):
-		return arcPoint(self.x - p.x, self.y - p.y, self.z - p.z, self.color)
-	
-	def __rsub__(self):
-		return arcPoint(-self.x, -self.y, -self.z, self.color)
+		return arcPoint(self.x - p.x, self.y - p.y, self.z - p.z, QColor(self.color.red(), self.color.green(), self.color.blue()))
 	
 	def __add__(self, p):
-		return arcPoint(self.x + p.x, self.y + p.y, self.z + p.z, self.color)
-		
+		return arcPoint(self.x + p.x, self.y + p.y, self.z + p.z, QColor(self.color.red(), self.color.green(), self.color.blue()))
+	
+	def __eq__(self, p):
+		return self.x == p.x and self.y == p.y and self.z == p.z
+	
+	def __ne__(self, p):
+		return not self.__eq__(p)
+	
 	def __str__(self):
 		return '<' + str(self.x) + ',' + str(self.y) + ',' + str(self.z) + '>'
+		
+	def __repr__(self):
+		return '<' + str(self.x) + ',' + str(self.y) + ',' + str(self.z) + '>'
+	
+	def __mul__(self, k):
+		return arcPoint(self.x*k, self.y*k, self.z*k, QColor(self.color.red(), self.color.green(), self.color.blue()))
+	
+	def __rmul__(self, k):
+		return arcPoint(self.x*k, self.y*k, self.z*k, QColor(self.color.red(), self.color.green(), self.color.blue()))
 		
 	
 	def dotProduct(self, p):
 		return p.x*self.x + p.y*self.y + p.z*self.z
 	
 	def vectorProduct(self, p):
-		newPoint = arcPoint(self.x, self.y, self.z, self.color)
+		newPoint = arcPoint(self.x, self.y, self.z)
 		
 		newPoint.x = self.y*p.z - p.y*self.z
+		if newPoint.x == -0.0:
+			newPoint.x = 0.0
 		newPoint.y = self.z*p.x - p.z*self.x
+		if newPoint.y == -0.0:
+			newPoint.y = 0.0
 		newPoint.z = self.x*p.y - p.x*self.y
+		if newPoint.z == -0.0:
+			newPoint.z = 0.0
 		
 		return newPoint
 	
@@ -162,6 +256,7 @@ class arcPoint():
 			self.x = self.x/norm
 			self.y = self.y/norm
 			self.z = self.z/norm
+		return self
 	
 	def getNormal(self):
 		norm = sqrt(self.x*self.x + self.y*self.y + self.z*self.z)
@@ -207,6 +302,11 @@ class arcCanvasWindow(QWidget):
 		
 		self.initUI(title, width, height, x, y)
 	
+	def initUI(self, title, width, height, x, y):
+		self.setWindowTitle(title)
+		self.setGeometry(x, y, width, height)
+		self.show()
+	
 	def setWorldSpace(self, minX, maxX, minY, maxY, minZ, maxZ):
 		self.minX = minX
 		self.maxX = maxX
@@ -219,16 +319,19 @@ class arcCanvasWindow(QWidget):
 		
 		self.calculateCameraBaseVectors()
 	
-	def setCameraPosition(self, x, y, z):
-		self.cameraPosition = arcPoint(x, y, z)
+	def setCameraPosition(self, x, y=None, z=None):
+		if x.__class__.__name__ == 'arcPoint':
+			self.cameraPosition = x
+		else:
+			self.cameraPosition = arcPoint(x, y, z)
 		self.calculateCameraBaseVectors()
 	
 	def pointCameraAt(self, x, y, z):
-		self.cameraPointAt = arcPoint(x, y, z).getNormal()
+		self.cameraPointAt = arcPoint(x, y, z).normalize()
 		self.calculateCameraBaseVectors()
 	
 	def setCameraUpVector(self, x, y, z):
-		self.cameraUp = arcPoint(x, y, z).getNormal()
+		self.cameraUp = arcPoint(x, y, z).normalize()
 		self.calculateCameraBaseVectors()
 	
 	def setProjectionMode(self, projectionMode):
@@ -237,7 +340,7 @@ class arcCanvasWindow(QWidget):
 			self.projectionMatrix = [
 										[1, 0, 0, 0],
 										[0, 1, 0, 0],
-										[0, 0, 0, 0],
+										[0, 0, 1, 0],
 										[0, 0, 0, 1],
 									]
 		else:
@@ -245,13 +348,13 @@ class arcCanvasWindow(QWidget):
 			self.projectionMatrix = [
 										[1, 0, 0, 0],
 										[0, 1, 0, 0],
-										[0, 0, 0, 0],
+										[0, 0, 1, 0],
 										[0, 0, 0, 1],
 									]
 	
 	def calculateCameraBaseVectors(self):
-		self.w = (self.cameraPosition - self.cameraPointAt).getNormal()
-		self.u = self.cameraUp.vectorProduct(self.w).getNormal()
+		self.w = (self.cameraPosition - self.cameraPointAt).normalize()
+		self.u = self.cameraUp.vectorProduct(self.w).normalize()
 		self.v = self.w.vectorProduct(self.u)
 		
 		tempPoint = arcPoint(self.u.x*self.cameraPosition.x + self.u.y*self.cameraPosition.y + self.u.z*self.cameraPosition.z, 
@@ -265,26 +368,20 @@ class arcCanvasWindow(QWidget):
 									[0,			0,			0,			1]
 									]
 			
-		self.widthRatio = self.width()/(self.maxX-self.minX)
-		self.heightRatio = self.height()/(self.maxY-self.minY)
-		
-		
-		
-	def initUI(self, title, width, height, x, y):
-		self.setWindowTitle(title)
-		self.setGeometry(x, y, width, height)
-		self.show()
+		self.widthRatio = 1.0*(self.width()-1)/(self.maxX-self.minX)
+		self.heightRatio = 1.0*(self.height()-1)/(self.maxY-self.minY)
 		
 		
 	def setDisplayFunction(self, displayFunct):
 		self.displayFunct = displayFunct
 		
 	def paintEvent(self, e):
-		global points
+		global polygons, currentMatrix, lights, ka, kd, ks, ksp
 		qpainter = QPainter()
 	
 		qpainter.begin(self)
 		
+		z_buffer = {}
 		
 		#Draw background
 		qpainter.setBrush(self.backgroundBrush)
@@ -292,17 +389,173 @@ class arcCanvasWindow(QWidget):
 		
 		
 		if self.displayFunct is not None:
-			self.displayFunct()
+			self.displayFunct(self)
 		
-		for p in points:
-			qpainter.setPen(p.color)
-			p.multMatrix(self.worldToCameraMatrix)
-			p.multMatrix(self.projectionMatrix)
-			x = int(self.widthRatio*p.x + self.widthRatio*(-self.minX)) 
-			y = int(self.heightRatio*p.y + self.heightRatio*(-self.minY))
-			qpainter.drawPoint(x, y)
+		polyIndex = 1
 		
-		points = []
+		for poly in polygons:
+			
+			points = {}
+			lastPoint = None
+			
+			normal = self.cameraPosition.getNormal()
+			
+			if len(poly) > 2:
+				v1 = poly[1] - poly[0]
+				v2 = poly[2] - poly[0]
+				normal = v1.vectorProduct(v2).normalize()
+				
+				otherNormal = v1.vectorProduct(v2).normalize()
+				otherNormal.multMatrix(self.worldToCameraMatrix)
+				
+				p0temp = arcPoint(poly[0].x, poly[0].y, poly[0].z)
+				p1temp = arcPoint(poly[1].x, poly[1].y, poly[1].z)
+				p2temp = arcPoint(poly[2].x, poly[2].y, poly[2].z)
+				
+				p0temp.multMatrix(self.worldToCameraMatrix)
+				p1temp.multMatrix(self.worldToCameraMatrix)
+				p2temp.multMatrix(self.worldToCameraMatrix)
+				
+				v1temp = p1temp - p0temp
+				v2temp = p2temp - p0temp
+				
+				
+				transformedNormal = v1temp.vectorProduct(v2temp).normalize()
+				
+				if transformedNormal.z < 0:
+					continue
+				
+				
+				poly.append(arcPoint(poly[0]))
+				
+				
+			firstPointAdded = False
+			
+			for p in poly:
+				
+				I = 1.0
+				if len(lights) > 0:
+					I = 0.0
+					for l in lights:
+						lv = l - p
+						spec = self.cameraPosition.getNormal().dotProduct(l.getNormal())**ksp
+						#ln = l.getNormal()
+						#h = 2*normal.dotProduct(ln)*normal - ln
+						#spec = self.cameraPosition.getNormal().dotProduct(h)**ksp
+						I += (ka + kd*normal.dotProduct(lv.getNormal()) + ks*spec)/3
+					I = I/len(lights)
+				
+				if I <= 0:
+					p.color.setRed(0)
+					p.color.setGreen(0)
+					p.color.setBlue(0)
+				else:
+					r = p.color.red()*I
+					g = p.color.green()*I
+					b = p.color.blue()*I
+					
+					p.color.setRed(r)
+					p.color.setGreen(g)
+					p.color.setBlue(b)
+				
+				p.multMatrix(self.worldToCameraMatrix)
+				p.multMatrix(self.projectionMatrix)
+				
+				p.x = int(round(self.widthRatio*p.x + self.widthRatio*(-self.minX)))
+				p.y = int(round(self.height() - 1 - (self.heightRatio*p.y + self.heightRatio*(-self.minY))))
+				
+				if lastPoint is not None and p.y != lastPoint.y:
+					mx = p.x - lastPoint.x
+					my = p.y - lastPoint.y
+					mz = p.z - lastPoint.z
+					mRed = p.color.red() - lastPoint.color.red()
+					mGreen = p.color.green() - lastPoint.color.green()
+					mBlue = p.color.blue() - lastPoint.color.blue()
+					s = max(abs(mx), abs(my))
+					if s == 0:
+						continue
+					dx = 1.0*mx/s
+					dy = 1.0*my/s
+					dz = 1.0*mz/s
+					
+					dRed = 1.0*mRed/s
+					dGreen = 1.0*mGreen/s
+					dBlue = 1.0*mBlue/s
+					
+					for i in range(1, s):
+						x = int(lastPoint.x + dx*i)
+						y = int(lastPoint.y + dy*i)
+						z = lastPoint.z + dz*i
+						
+						r = lastPoint.color.red() + dRed*i
+						g = lastPoint.color.green() + dGreen*i
+						b = lastPoint.color.blue() + dBlue*i
+						if y in points:
+							points[y].append(arcPoint(x, y, z, QColor(r, g, b)))
+						else:
+							points[y] = [arcPoint(x, y, z, QColor(r, g, b))]
+				lastPoint = p
+				
+				if p == poly[0] and firstPointAdded:
+					continue
+				firstPointAdded = True
+				if p.y in points:
+					points[p.y].append(p)
+				else:
+					points[p.y] = [p]
+			
+			for y in points.keys():
+				p1 = points[y][0]
+				if len(points[y]) == 1:
+					qpainter.setPen(p1.color)
+					if y in z_buffer:
+						if p1.x in z_buffer[y]:
+							if p1.z > z_buffer[y][p1.x]:
+								qpainter.drawPoint(p1.x, y)
+								z_buffer[y][p1.x] = p1.z
+						else:
+							qpainter.drawPoint(p1.x, y)
+							z_buffer[y][p1.x] = p1.z
+					else:
+						z_buffer[y] = {p1.x: p1.z}
+						qpainter.drawPoint(p1.x, y)
+					continue
+				for index in range(1, len(points[y])):
+					p1 = points[y][index-1]
+					p2 = points[y][index]
+					mx = p2.x - p1.x
+					mz = p2.z - p1.z
+					mRed = p2.color.red() - p1.color.red()
+					mGreen = p2.color.green() - p1.color.green()
+					mBlue = p2.color.blue() - p1.color.blue()
+					s = abs(mx)
+					if s == 0:
+						continue
+					dx = 1.0*mx/s
+					dz = 1.0*mz/s
+					dRed = 1.0*mRed/s
+					dGreen = 1.0*mGreen/s
+					dBlue = 1.0*mBlue/s
+					if y not in z_buffer:
+						z_buffer[y] = {}
+					for i in range(0, s+1):
+						x = int(p1.x + dx*i)
+						z = p1.z + dz*i
+						
+						r = p1.color.red() + dRed*i
+						g = p1.color.green() + dGreen*i
+						b = p1.color.blue() + dBlue*i
+						qpainter.setPen(QColor(r, g, b))
+						if x in z_buffer[y]:
+							if z > z_buffer[y][x]:
+								qpainter.drawPoint(x, y)
+								z_buffer[y][x] = z
+						else:
+							z_buffer[y][x] = z
+							qpainter.drawPoint(x, y)
+			polyIndex += 1
+		arcClearScreen()
+		
 		qpainter.end()
 	
 	def setBackgroundBrush(self, color):

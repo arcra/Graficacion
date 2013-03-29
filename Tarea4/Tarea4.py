@@ -10,21 +10,55 @@ currentAngle = 0
 deltaTime = 0.1
 angleTimer = None
 
-def displayFunct():
+cameraPos = arcPoint(4, 3, 3)
+
+def displayFunct(canvas):
+	global cameraPos, currentAngle
 	
 	arcPushMatrix()
 	
-	arcRotateY(currentAngle)
+	arcRotateY(currentAngle/2)
 	
+	#arcRotateY(currentAngle, cameraPos)
+	
+	#canvas.setCameraPosition(cameraPos)
+	
+	arcBeginPolygon(4)
+	
+	arcSetColor(0, 255, 0)
+	
+	arcSetPoint(arcPoint(2, 2, 2))
+	arcSetPoint(arcPoint(-2, 2, 2))
 	arcSetPoint(arcPoint(-2, -2, 2))
-	arcSetPoint(arcPoint(-2, -2, -2))
-	arcSetPoint(arcPoint(2, -2, -2))
 	arcSetPoint(arcPoint(2, -2, 2))
+	
+	arcSetPoint(arcPoint(2, 2, -2))
+	arcSetPoint(arcPoint(2, 2, 2))
+	arcSetPoint(arcPoint(2, -2, 2))
+	arcSetPoint(arcPoint(2, -2, -2))
 	
 	arcSetPoint(arcPoint(-2, 2, 2))
 	arcSetPoint(arcPoint(-2, 2, -2))
+	arcSetPoint(arcPoint(-2, -2, -2))
+	arcSetPoint(arcPoint(-2, -2, 2))
+	
+	arcSetPoint(arcPoint(-2, 2, -2))
 	arcSetPoint(arcPoint(2, 2, -2))
+	arcSetPoint(arcPoint(2, -2, -2))
+	arcSetPoint(arcPoint(-2, -2, -2))
+	
+	arcSetPoint(arcPoint(2, 2, -2))
+	arcSetPoint(arcPoint(-2, 2, -2))
+	arcSetPoint(arcPoint(-2, 2, 2))
 	arcSetPoint(arcPoint(2, 2, 2))
+	
+	arcSetPoint(arcPoint(2, -2, 2))
+	arcSetPoint(arcPoint(-2, -2, 2))
+	arcSetPoint(arcPoint(-2, -2, -2))
+	arcSetPoint(arcPoint(2, -2, -2))
+	
+	arcEndPolygon()
+	
 	
 	arcPopMatrix()
 
@@ -50,9 +84,11 @@ if __name__ == '__main__':
 	canvas = arcCanvasWindow('Tarea 4 - Adrian Revuelta Cuauhtli', width=600, height=600)
 	
 	canvas.setWorldSpace(-5, 5, -5, 5, -5, 5)
-	canvas.setCameraPosition(4, 3, 3)
-	canvas.pointCameraAt(0, 0, 0)
 	canvas.setCameraUpVector(0, 1, 0)
+	canvas.pointCameraAt(0, 0, 0)
+	canvas.setCameraPosition(cameraPos)
+	
+	arcSetOmniLight(5, 4, 4)
 	
 	canvas.setDisplayFunction(displayFunct)
 	

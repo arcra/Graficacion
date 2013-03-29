@@ -10,7 +10,7 @@ currentAngle = 0
 deltaTime = 0.1
 angleTimer = None
 
-def displayFunct():
+def displayFunct(canvas):
 	
 	arcPushMatrix()
 	
